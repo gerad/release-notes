@@ -32,6 +32,9 @@ func main() {
 	var repo struct {
 		Commits []struct {
 			Commit struct {
+				Author struct {
+					Name string
+				}
 				Message string
 			}
 		}
@@ -46,15 +49,23 @@ func main() {
 		log.Fatalf("%v", err)
 	}
 
-	re := regexp.MustCompile("Merge pull request #(\\d+).*\n\n(.*)")
+	re1 := regexp.MustCompile("Merge pull request #(?P<num>\\d+).*\n\n(?P<title>.*)")
+	re2 := regexp.MustCompile("(?P<title>.*) \\(#(?P<num>\\d+)\\)")
+
 	for _, commit := range repo.Commits {
-		matches := re.FindStringSubmatch(commit.Commit.Message)
-		if matches != nil && len(matches) == 3 {
-			pr := struct {
-				num   string
-				title string
-			}{matches[1], matches[2]}
-			fmt.Printf("#%s - %s\n", pr.num, pr.title)
+		for _, re := range []*regexp.Regexp{re1, re2} {
+			matches := re.FindStringSubmatch(commit.Commit.Message)
+			if matches != nil && len(matches) == 3 {
+				result := make(map[string]string)
+				for i, name := range re.SubexpNames() {
+					if i != 0 {
+						result[name] = matches[i]
+					}
+				}
+
+				fmt.Printf("%s - https://github.com/%s/%s/pull/%s - %s\n", commit.Commit.Author.Name, config.owner, config.repo, result["num"], result["title"])
+				break
+			}
 		}
 	}
 }
